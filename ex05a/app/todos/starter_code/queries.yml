@@ -1,0 +1,92 @@
+
+# --
+# Queries A
+#
+
+qa_0: > 
+  DROP TABLE IF EXISTS datadb300.videos;
+
+qa_1: &qa_1 > 
+
+
+qa_2: &qa_2
+
+
+qa_3: >
+
+
+qa_4: >
+
+
+qa_5: >
+
+
+qa_6: >
+
+
+qa_7: >
+
+
+qa_8: >
+
+
+
+# --
+# Queries B
+#
+
+qb_0: &qb_0 > 
+  DROP TABLE IF EXISTS datadb300.videos_by_tag
+
+qb_1: *qa_1  # don't change
+
+qb_2: *qa_2  # don't change
+
+qb_3: >
+
+
+qb_4: >
+
+
+qb_5: &qb_5 >
+
+
+qb_6: >
+
+
+qb_7: >
+
+
+qb_8: >
+
+
+qb_9: >
+
+
+
+# --
+# Queries C
+#
+
+qc_0: *qb_0 # don't change
+
+qc_1: *qa_1 # don't change
+
+qc_2: *qa_2 # don't change
+
+qc_3: >
+
+
+qc_4: *qb_5 # don't change
+
+qc_5: >
+
+
+qc_6: >
+
+
+qc_7: >
+
+
+qc_8: >
+

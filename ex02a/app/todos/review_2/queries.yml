@@ -1,0 +1,163 @@
+
+
+# --
+# Examples
+#
+
+# (0a) Number of persons
+
+qry_0a: >
+  MATCH (:Person) 
+  RETURN COUNT(*) AS person_count
+
+# (0b) Number of movies
+
+qry_0b: >
+  MATCH (:Movie) 
+  RETURN COUNT(*) AS movie_count
+
+
+# --
+# Retrieve data
+#
+
+# (1) In what years have films been released in this millennium?
+
+qry_1: >
+  MATCH (m:Movie)
+  WHERE m.released >= 2000
+  RETURN DISTINCT m.released AS year
+  ORDER BY year
+
+
+# (2) Who work as directors?
+
+qry_2: >
+  MATCH (p)-[:DIRECTED]->(m:Movie)
+  RETURN DISTINCT p.name AS Director
+  ORDER BY Director
+
+
+
+# (3) Who has followers? 
+
+qry_3: >
+  MATCH (p:Person)<-[:FOLLOWS]-()
+  RETURN DISTINCT p.name AS followed_person
+
+
+# (4) How do people with followers relate to movies? 
+
+qry_4: >
+  MATCH (p:Person)<-[:FOLLOWS]-()
+  MATCH (p)-[r]->(m:Movie)
+  RETURN DISTINCT
+    p.name AS followed_person,
+    TYPE(r) AS movie_relationship
+
+
+# (5) What movies have been reviewed? 
+
+qry_5: >
+  MATCH (m)<-[r:REVIEWED]-(:Person)
+  WITH m, AVG(r.rating) AS avg_rating
+  RETURN m.title AS movie
+  ORDER BY avg_rating DESC
+
+# (6) Which of the films has received the best review?
+
+qry_6: >
+  MATCH (m)<-[r:REVIEWED]-(p:Person)
+  WITH m, r.rating AS rating, p.name AS reviewer
+  RETURN m.title AS movie, rating, reviewer
+  ORDER BY rating DESC
+  LIMIT 1
+
+
+
+# (7) Which of the actors also work as directors? 
+
+qry_7: >
+  MATCH (p:Person)-[:ACTED_IN]->(m1:Movie), (p)-[:DIRECTED]->(m2:Movie)
+  RETURN DISTINCT p.name AS actor_director_any
+  ORDER BY p.name ASC
+
+
+
+# (8) Who have acted in the films they have directed? 
+
+qry_8: >
+    MATCH (p:Person)-[:ACTED_IN]->(m), (p)-[:DIRECTED]->(m)
+    RETURN DISTINCT p.name AS actor_director_own
+    ORDER BY p.name ASC
+
+
+# (9) Show Jack Nicholson movie taglines. 
+
+qry_9: >
+  MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+  WHERE p.name = "Jack Nicholson" AND m.tagline IS NOT NULL
+  RETURN m.title AS movie, m.tagline AS tagline
+
+
+
+# (10) Who are the actors named Bill? 
+
+qry_10: >
+  MATCH (p:Person)-[:ACTED_IN]->(:Movie)
+  WHERE split(p.name, " ")[0] = "Bill"
+  RETURN DISTINCT p.name AS actor_name
+  ORDER BY p.name ASC
+
+
+
+# --
+# Modify graph
+#
+
+# (1) Add a course
+
+crud_1: >
+  MERGE (c:Course {code: "COMP.SE.121"})
+  ON CREATE SET c.name = "Software Product and Process Management"
+  RETURN c
+
+
+
+# (2) Add two teachers
+
+crud_2: >
+  MERGE (t1:Teacher {name: "Karri Veto"})
+  MERGE (t2:Teacher {name: "Ahti Teronen"})
+
+
+
+
+# (3) Set a person as responsible teacher of the course
+
+crud_3: >
+  MATCH (c:Course {code: "COMP.SE.121"})
+  MATCH (t1:Teacher {name: "Karri Veto"})
+  MERGE (t1)-[:IS_RESPONSIBLE_FOR]->(c)
+
+
+
+# (4) Add another course and make it a prerequisite for the first
+
+crud_4: >
+  MERGE (c:Course {code: "TIE-02306"})
+  ON CREATE SET c.name = "Introduction to Software Engineering"
+  WITH c
+  MATCH (c2:Course {code: "COMP.SE.121"})
+
+  Merge (c)-[:IS_PREREQUISITE_OF]->(c2)
+
+
+
+# (5) Remove teachers who are not responsible for courses
+
+crud_5: >
+  MATCH (t:Teacher)
+  WHERE NOT EXISTS { MATCH (t)-[:IS_RESPONSIBLE_FOR]->(:Course) }
+  DELETE t
+

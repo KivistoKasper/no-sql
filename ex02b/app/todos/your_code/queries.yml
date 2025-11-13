@@ -1,0 +1,273 @@
+# --
+# (A) Build-in
+#
+
+# (QA.1) How long is the shortest paths from "Kevin Bacon" to "Meg Ryan"?
+# (QA.2) How many shortest paths are there from "Kevin Bacon" to "Meg Ryan"?
+# (QA.3) What is one of the shortest paths from "Kevin Bacon" to "Meg Ryan"?
+# (QA.4) What are the distinct shortest paths from "Kevin Bacon" to "Meg Ryan"?
+
+# (QA.1) How long is the shortest paths from "Kevin Bacon" to "Meg Ryan"?
+
+qa_1: >
+  MATCH
+    (KevinB:Person {name: 'Kevin Bacon'}),
+    (MegR:Person {name: 'Meg Ryan'}),
+    p = shortestPath((KevinB)-[*]-(MegR))
+  RETURN length(p) AS shortestPathLength
+
+# (QA.2) How many shortest paths are there from "Kevin Bacon" to "Meg Ryan"?
+
+qa_2: >
+  MATCH
+    (KevinB:Person {name: 'Kevin Bacon'}),
+    (MegR:Person {name: 'Meg Ryan'}),
+    p = allShortestPaths((KevinB)-[*]-(MegR))
+  RETURN count(p) AS shortestPathCount
+
+# (QA.3) What is one of the shortest paths from "Kevin Bacon" to "Meg Ryan"?
+
+qa_3: >
+  MATCH
+    (KevinB:Person {name: 'Kevin Bacon'}),
+    (MegR:Person {name: 'Meg Ryan'}),
+    p = shortestPath((KevinB)-[*]-(MegR))
+  RETURN [n in nodes(p) | 
+    CASE 
+      WHEN n:Person THEN '(' + n.name + ')' 
+      WHEN n:Movie THEN '-' + n.title + '-' 
+      ELSE n.name 
+    END ] AS oneShortestPath
+
+# (QA.4) What are the distinct shortest paths from "Kevin Bacon" to "Meg Ryan"?
+
+qa_4: >
+  MATCH
+    (KevinB:Person {name: 'Kevin Bacon'}),
+    (MegR:Person {name: 'Meg Ryan'}),
+    paths = allShortestPaths((KevinB)-[*]-(MegR))
+  RETURN DISTINCT
+    [n in nodes(paths) | 
+      CASE 
+        WHEN n:Person THEN '(' + n.name + ')' 
+        ElSE '-' + n.title + '-' 
+      END
+    ] AS allShortestPaths
+
+# --
+# (B) Native projection
+#
+
+# (QB.1) Create a native projection of Person and Movie nodes and ACTED_IN and DIRECTED relationships.
+# (QB.2) How long is the shortest paths from "Kevin Bacon" to "Meg Ryan" (use "dijkstra")?
+# (QB.3) What is one of the shortest paths from "Kevin Bacon" to "Meg Ryan" (use "dijkstra")?
+# (QB.4) What is one of the shortest paths from "Kevin Bacon" to "Meg Ryan" (use "yens")?
+# (QB.5) What are the seven shortest paths from "Kevin Bacon" to "Meg Ryan" (use "yens")?
+# (QB.6) Remove the "person-movie" projection. (= ALREADY PREPARED =)
+
+# (QB.1) Create a native projection of Person and Movie nodes and ACTED_IN and DIRECTED relationships.
+
+# Hints:
+# https://neo4j.com/docs/graph-data-science/current/management-ops/projections/graph-project/
+
+qb_1: >
+  CALL gds.graph.project(
+    'person-movie',
+    ['Person', 'Movie'],
+    {
+      ACTED_IN: {orientation: 'UNDIRECTED'},
+      DIRECTED: {orientation: 'UNDIRECTED'}
+    }
+  )
+  YIELD graphName, nodeCount, relationshipCount
+
+# (QB.2) How long is the shortest paths from "Kevin Bacon" to "Meg Ryan" (use "dijkstra")?
+
+# Hints:
+# https://neo4j.com/docs/graph-data-science/current/algorithms/dijkstra-source-target/
+# Example: GDS Fundamentals Course
+
+qb_2: >
+  MATCH 
+    (KevinB:Person {name: 'Kevin Bacon'}),
+    (MegR:Person {name: 'Meg Ryan'})
+  CALL gds.shortestPath.dijkstra.stream('person-movie', {
+    sourceNode: id(KevinB),
+    targetNode: id(MegR),
+    relationshipWeightProperty: null
+  })
+  YIELD path
+  RETURN length(path) AS shortestPathLength
+
+# (QB.3) What is one of the shortest paths from "Kevin Bacon" to "Meg Ryan" (use "dijkstra")?
+
+qb_3: >
+  MATCH 
+    (KevinB:Person {name: 'Kevin Bacon'}),
+    (MegR:Person {name: 'Meg Ryan'})
+  CALL gds.shortestPath.dijkstra.stream('person-movie', {
+    sourceNode: id(KevinB),
+    targetNode: id(MegR),
+    relationshipWeightProperty: null
+  })
+  YIELD nodeIds
+  RETURN [n in nodeIds | 
+    CASE 
+      WHEN gds.util.asNode(n):Person THEN '(' + gds.util.asNode(n).name + ')' 
+      ELSE '-' + gds.util.asNode(n).title + '-' 
+    END
+  ] AS oneShortestPath
+
+# (QB.4) What is one of the shortest paths from "Kevin Bacon" to "Meg Ryan" (use "yens")?
+
+# Hints:
+# https://neo4j.com/docs/graph-data-science/current/algorithms/yens/
+
+qb_4: >
+  MATCH 
+      (KevinB:Person {name: 'Kevin Bacon'}),
+      (MegR:Person {name: 'Meg Ryan'})
+    CALL gds.shortestPath.yens.stream('person-movie', {
+      sourceNode: id(KevinB),
+      targetNode: id(MegR),
+      k: 1,
+      relationshipWeightProperty: null
+    })
+    YIELD nodeIds
+    RETURN [n in nodeIds | 
+      CASE 
+        WHEN gds.util.asNode(n):Person THEN '(' + gds.util.asNode(n).name + ')' 
+        ELSE '-' + gds.util.asNode(n).title + '-' 
+      END
+    ] AS oneShortestPath
+
+# (QB.5) What are the seven shortest paths from "Kevin Bacon" to "Meg Ryan" (use "yens")?
+
+qb_5: >
+  MATCH 
+      (KevinB:Person {name: 'Kevin Bacon'}),
+      (MegR:Person {name: 'Meg Ryan'})
+    CALL gds.shortestPath.yens.stream('person-movie', {
+      sourceNode: id(KevinB),
+      targetNode: id(MegR),
+      k: 7,
+      relationshipWeightProperty: null
+    })
+    YIELD path, nodeIds
+    RETURN length(path) AS length, [n in nodeIds | 
+      CASE 
+        WHEN gds.util.asNode(n):Person THEN '(' + gds.util.asNode(n).name + ')' 
+        ELSE '-' + gds.util.asNode(n).title + '-' 
+      END
+    ] AS sevenShortestPaths
+
+# (QB.6) Remove the "person-movie" projection.
+
+# (= ALREADY PREPARED =)
+
+qb_6: >
+  CALL gds.graph.drop('person-movie')
+  YIELD graphName, nodeCount, relationshipCount
+
+# --
+# (C) Cypher projection
+#
+
+# (QC.1) Create a cypher projection ...
+# (QC.2) Determine the actors' unweighted degree of centrality.
+# (QC.3) Determine the actors' weighted degree of centrality.
+# (QC.4) Mutate the weighted degree of centrality to the nodes of the projection.
+# (QC.5) Remove the mutated property. (= ALREADY PREPARED =)
+# (QC.6) Detemine the Lovain communities of actors.
+# (QC.7) Write the community IDs into the graph (not into projection).
+# (QC.8) Remove the "person-acted-with" projection. (= ALREADY PREPARED =)
+
+# (QC.1) Create a cypher projection ...
+
+# Hints:
+# Create a similar cypher projection between Person nodes ("ACTED_WITH")
+# as in the example of Introduction to Neo4j GDS mini-course.
+# No WHERE clause is needed. Our schema is slightly different from the example.
+#
+# https://neo4j.com/docs/graph-data-science/current/management-ops/projections/graph-project-cypher/
+# Example: Intro to Neo4j GDS course
+
+qc_1: >
+  MATCH (source:Person)-[r:ACTED_IN]->(m:Movie)<-[:ACTED_IN]-(target:Person)
+  WITH source, target, count(r) AS actedWithCount, type(r) AS type
+  WITH gds.graph.project(
+      'person-acted-with',
+      source,
+      target,
+      { 
+        sourceNodeLabels: labels(source),
+        targetNodeLabels: labels(target), 
+        relationshipType: type,
+        relationshipProperties: { actedWithCount: actedWithCount }
+      }
+  ) AS g
+  RETURN
+    g.graphName AS graphName, g.nodeCount AS nodeCount, g.relationshipCount AS relationshipCount
+
+# (QC.2) Determine the actors' unweighted degree of centrality.
+
+# Hints:
+# https://neo4j.com/docs/graph-data-science/current/algorithms/degree-centrality/
+# Example: Intro to Neo4j GDS course
+
+qc_2: >
+  CALL gds.degree.stream('person-acted-with')
+  YIELD nodeId, score
+  RETURN gds.util.asNode(nodeId).name AS name, score
+  ORDER BY score DESC LIMIT 10
+
+# (QC.3) Determine the actors' weighted degree of centrality.
+
+qc_3: >
+  CALL gds.degree.stream('person-acted-with',{relationshipWeightProperty: 'actedWithCount'})
+  YIELD nodeId, score
+  RETURN gds.util.asNode(nodeId).name AS name, score
+  ORDER BY score DESC LIMIT 10
+
+# (QC.4) Mutate the weighted degree of centrality to the nodes of the projection.
+
+qc_4: >
+  CALL gds.degree.mutate('person-acted-with', { mutateProperty: 'actedWithScore' })
+  YIELD nodePropertiesWritten
+  RETURN nodePropertiesWritten
+
+# (QC.5) Remove the mutated property.
+
+# (= ALREADY PREPARED =)
+
+qc_5: >
+  CALL gds.graph.nodeProperties.drop('person-acted-with', 'actedWithScore')
+  YIELD propertiesRemoved
+
+# (QC.6) Detemine the Lovain communities of actors.
+
+# Hints:
+# https://neo4j.com/docs/graph-data-science/current/algorithms/louvain/
+
+qc_6: >
+  CALL gds.louvain.stream('person-acted-with')
+  YIELD nodeId, communityId
+  WITH communityId, collect(gds.util.asNode(nodeId).name) AS actors
+  RETURN communityId AS community,
+        size(actors) AS memberCount,
+        HEAD(actors) + [actors[1]] + [actors[2]] AS exampleMembers
+  ORDER BY communityId ASC;
+
+# (QC.7) Write the community IDs into the graph (not into projection).
+
+qc_7: >
+  CALL gds.louvain.write('person-acted-with', { writeProperty: 'communityId' })
+  YIELD nodePropertiesWritten
+
+# (QC.8) Remove the "person-acted-with" projection.
+
+# (= ALREADY PREPARED =)
+
+qc_8: >
+  CALL gds.graph.drop('person-acted-with')
+  YIELD graphName, nodeCount, relationshipCount

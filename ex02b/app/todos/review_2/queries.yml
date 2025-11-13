@@ -1,0 +1,142 @@
+qa_1: >
+  MATCH (a:Person {name: "Kevin Bacon"}), (b:Person {name: "Meg Ryan"})
+  MATCH path = shortestPath((a)-[*]-(b))
+  RETURN length(path) AS shortestPathLength;
+
+qa_2: >
+  MATCH (a:Person {name: "Kevin Bacon"}), (b:Person {name: "Meg Ryan"})
+  MATCH path = allShortestPaths((a)-[*]-(b))
+  RETURN count(path) AS shortestPathCount;
+
+qa_3: >
+  MATCH (a:Person {name: "Kevin Bacon"}), (b:Person {name: "Meg Ryan"})
+  MATCH path = shortestPath((a)-[*]-(b))
+  RETURN
+  [ n IN nodes(path) | CASE WHEN 'Movie' IN labels(n) THEN '-' + n.title + '-'
+    ELSE '(' + n.name + ')' END ] AS oneShortestPath;
+
+qa_4: >
+  MATCH (a:Person {name: "Kevin Bacon"}), (b:Person {name: "Meg Ryan"})
+  MATCH path = allShortestPaths((a)-[*]-(b))
+  RETURN DISTINCT [node IN nodes(path) | coalesce('(' + node.name + ')', '-' + node.title + '-')] AS allDistinctShortedPaths;
+
+qb_1: >
+  CALL gds.graph.project(
+    'person-movie',
+    ['Person', 'Movie'],
+    {
+      ACTED_IN: { orientation: 'UNDIRECTED' },
+      DIRECTED: { orientation: 'UNDIRECTED' }
+    }
+  )
+  YIELD graphName, nodeCount, relationshipCount;
+
+
+qb_2: >
+  MATCH (a:Person {name: 'Kevin Bacon'}), (b:Person {name: 'Meg Ryan'})
+  CALL gds.shortestPath.dijkstra.stream(
+    'person-movie',
+    {
+    sourceNode: a,
+    targetNode: b
+    }
+  )
+  YIELD totalCost
+  RETURN toInteger(totalCost) AS shortestPathLength;
+
+qb_3: >
+  MATCH (a:Person {name: 'Kevin Bacon'}), (b:Person {name: 'Meg Ryan'})
+  CALL gds.shortestPath.dijkstra.stream(
+    'person-movie',
+    {
+    sourceNode: a,
+    targetNode: b
+    }
+  )
+  YIELD nodeIds
+  RETURN [nodeId IN nodeIds | CASE WHEN 'Movie' IN labels(gds.util.asNode(nodeId)) THEN '-' + gds.util.asNode(nodeId).title + '-'
+    ELSE '(' + gds.util.asNode(nodeId).name + ')' END ] AS oneShortestPath;
+
+qb_4: >
+  MATCH (a:Person {name: 'Kevin Bacon'}), (b:Person {name: 'Meg Ryan'})
+  CALL gds.shortestPath.yens.stream(
+    'person-movie',
+    {
+      sourceNode: a,
+      targetNode: b,
+      k: 1
+    }
+  )
+  YIELD nodeIds
+  RETURN [nodeId IN nodeIds | CASE WHEN 'Movie' IN labels(gds.util.asNode(nodeId)) THEN '-' + gds.util.asNode(nodeId).title + '-'
+    ELSE '(' + gds.util.asNode(nodeId).name + ')' END ] AS oneShortestPath;
+
+qb_5: >
+  MATCH (a:Person {name: 'Kevin Bacon'}), (b:Person {name: 'Meg Ryan'})
+  CALL gds.shortestPath.yens.stream(
+    'person-movie',{
+    sourceNode: a,
+    targetNode: b,
+    k: 7
+    }
+  )
+  YIELD nodeIds, totalCost
+  RETURN toInteger(totalCost) AS length, [nodeId IN nodeIds | CASE WHEN 'Movie' IN labels(gds.util.asNode(nodeId))
+    THEN '-' + gds.util.asNode(nodeId).title + '-'
+    ELSE '(' + gds.util.asNode(nodeId).name + ')' END ] AS sevenShortestPaths;
+
+qb_6: >
+  CALL gds.graph.drop('person-movie')
+  YIELD graphName, nodeCount, relationshipCount
+
+qc_1: >
+  CALL gds.graph.project.cypher(
+      'person-acted-with',
+      'MATCH (p:Person)-[:ACTED_IN]->(:Movie) RETURN DISTINCT id(p) AS id, labels(p) AS labels',
+      'MATCH (source:Person)-[r:ACTED_IN]->(m:Movie)<-[:ACTED_IN]-(target:Person) 
+       RETURN id(source) AS source, id(target) AS target, count(r) AS actedWithCount, "ACTED_WITH" AS type'
+  )
+  YIELD graphName, nodeCount, relationshipCount
+  RETURN graphName, nodeCount, relationshipCount;
+
+qc_2: >
+  CALL gds.degree.stream('person-acted-with')
+  YIELD nodeId, score
+  RETURN gds.util.asNode(nodeId).name AS name, score
+  ORDER BY score DESC LIMIT 10
+
+qc_3: >
+  CALL gds.degree.stream('person-acted-with',{relationshipWeightProperty: 'actedWithCount'})
+  YIELD nodeId, score
+  RETURN gds.util.asNode(nodeId).name AS name, score
+  ORDER BY score DESC LIMIT 10
+
+qc_4: >
+  CALL gds.degree.mutate('person-acted-with', {
+    mutateProperty: 'actedWithScore',
+    relationshipWeightProperty: 'actedWithCount'
+  })
+  YIELD nodePropertiesWritten
+  RETURN nodePropertiesWritten;
+
+qc_5: >
+  CALL gds.graph.nodeProperties.drop('person-acted-with', 'actedWithScore')
+  YIELD propertiesRemoved
+
+qc_6: >
+  CALL gds.louvain.stream('person-acted-with') 
+  YIELD nodeId, communityId
+  WITH communityId AS community, COLLECT(gds.util.asNode(nodeId).name) AS members
+  WITH community, members, SIZE(members) AS memberCount
+  WHERE memberCount > 1
+  RETURN community, 
+         memberCount,
+         [member IN members | member][0..3] AS exampleMembers
+  ORDER BY community;
+
+qc_7: >
+  CALL gds.louvain.write('person-acted-with', { writeProperty: 'communityId' });
+
+qc_8: >
+  CALL gds.graph.drop('person-acted-with')
+  YIELD graphName, nodeCount, relationshipCount
